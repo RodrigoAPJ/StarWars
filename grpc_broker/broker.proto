@@ -1,0 +1,46 @@
+syntax = "proto3";
+
+option go_package = "../grpc_broker";
+
+service Broker {
+    rpc GetNumberRebels (FromLeia) returns (ToLeia) {}
+    rpc SendCommand (Command) returns (Servidor) {}
+}
+
+message FromLeia {
+    Planeta planeta = 1;
+    Ciudad ciudad = 2;
+    Reloj reloj = 3;
+}
+
+message ToLeia {
+    Rebeldes rebeldes = 1;
+    Reloj reloj = 2;
+    Servidor servidor = 3;
+}
+
+message Planeta {
+    string planeta = 1;
+}
+
+message Ciudad {
+    string ciudad = 1;
+}
+
+message Rebeldes {
+    int64 cantidad = 1;
+}
+
+message Reloj {
+    int64 X = 1;
+    int64 Y = 2;
+    int64 Z = 3;
+}
+
+message Servidor {
+    int64 id = 1;
+}
+
+message Command {
+    string command = 1;
+}

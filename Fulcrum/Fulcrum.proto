@@ -1,0 +1,66 @@
+syntax = "proto3";
+
+option go_package = "../grpc_fulcrum";
+
+service Fulcrum {
+    rpc F_GetNumberRebels (F_FromLeia) returns (F_ToLeia) {}
+    rpc F_SendCommand (F_From_Informante) returns (F_To_Informante) {}
+
+    rpc F_Request (Fantasma) returns (F_Merge_Data) {}
+    rpc F_Merge (F_Merge_Data) returns (Fantasma) {}
+}
+
+message F_FromLeia {
+    F_Planeta f_planeta = 1;
+    F_Ciudad f_ciudad = 2;
+}
+
+message F_From_Informante{
+    F_Command f_command = 1;
+    F_Reloj f_reloj = 2;
+}
+
+message F_To_Informante{
+    F_Reloj f_reloj = 1;
+    F_Log f_log = 2;
+}
+
+message F_Merge_Data{
+    F_Reloj f_reloj = 1;
+    F_Log f_log = 2;
+}
+
+message F_ToLeia {
+    F_Rebeldes f_rebeldes = 1;
+    F_Reloj f_reloj = 2;
+}
+
+message F_Planeta {
+    string planeta = 1;
+}
+
+message F_Ciudad {
+    string ciudad = 1;
+}
+
+message F_Log {
+    string log = 1;
+}
+
+message F_Rebeldes {
+    int64 cantidad = 1;
+}
+
+message F_Reloj {
+    int64 X = 1;
+    int64 Y = 2;
+    int64 Z = 3;
+}
+
+message F_Command {
+    string command = 1;
+}
+
+message Fantasma {
+    string fantasma = 1;
+}
