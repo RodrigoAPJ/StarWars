@@ -7,9 +7,11 @@ import (
 	"context"
 	"time"
 	"google.golang.org/grpc"
-	"fmt"
+	"bufio"
+  	"os"
 	"strconv"
-	//"strconv"
+	//"fmt"
+	"strings"
 )
 
 const (
@@ -49,20 +51,22 @@ func SendComm(){  //Mandar comando al broker para recibir una direccion de un se
 	ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
     defer cancel()
 	
-	var comando string
-	fmt.Scanf("%s", &comando)
+	comando := bufio.NewReader(os.Stdin)
+	linea, err := comando.ReadString('\n')
 
-    r, err := c.SendCommand(ctx, &grpc_broker.Command{Command:comando})
-        
+    r, err := c.SendCommand(ctx, &grpc_broker.Command{Command:linea})
+    
     if err != nil {
         log.Fatal(err)
     }
 
 	servidor := servers[r.Id]
 
+	log.Printf("Conectando a: " + servidor)
+
 	f := ConectarFulcrum(servidor)
 	//Mandar comando ahora a servers{r.id}
-	res, errr := f.F_SendCommand(ctx, &grpc_fulcrum.F_From_Informante{FCommand : comando, FReloj: &ultimoReloj, FServidor: ultimoServidor})
+	res, errr := f.F_SendCommand(ctx, &grpc_fulcrum.F_From_Informante{FCommand : linea, FReloj: &ultimoReloj, FServidor: ultimoServidor})
 
 	if errr != nil {
         log.Fatal(errr)
@@ -71,8 +75,24 @@ func SendComm(){  //Mandar comando al broker para recibir una direccion de un se
 	ultimoServidor = r.Id
 	ultimoReloj = *(res.FReloj)
 
-	s := strconv.Itoa(int(GetReloj(r.Id)))
-	log.Printf(s)
+	log.Printf("-------------------------------")
+	log.Printf("Log recibido:")
+	log.Printf(res.FLog)
+
+	ModificarDATA(linea, res.FLog)
+
+	PrintDATA()
+}
+
+func PrintDATA(){
+	log.Printf("_______DATA________")
+	for planeta, dic2 := range DATA {
+		for ciudad, habitantes := range dic2 {
+			h := strconv.Itoa(habitantes)
+			toPrint := planeta + " " + ciudad + " " + h
+        	log.Printf(toPrint)
+		}
+    }
 }
 
 func GetReloj(indice int64) int64 {
@@ -80,14 +100,69 @@ func GetReloj(indice int64) int64 {
 		return ultimoReloj.X 
 	} else if(indice == 2) {
 		return ultimoReloj.Y
+	} 
+
+	return ultimoReloj.Z
+}
+
+func ModificarDATA(comando string, res string) {
+	
+	if(res == "ERROR") {
+		log.Printf("No se pudo llevar a cabo el comando... :(")
+		return
+	}
+
+	splitted := strings.Fields(comando)
+	accion     := splitted[0]
+	planeta    := splitted[1]
+	ciudad     := splitted[2]
+	habitantes, _ := strconv.Atoi(splitted[3])
+
+	if (accion == "AddCity") {
+
+		if _, ok := DATA[planeta]; !ok {
+			// DATA[planeta][ciudad] does not exist -- create it!
+			DATA[planeta] = make(map[string]int)
+		}
+
+		DATA[planeta][ciudad] = habitantes
+
+	} else if (accion == "DeleteCity") {
+		
+		if _, ok := DATA[planeta][ciudad]; ok {
+			delete(DATA[planeta], ciudad)	
+		}
+
+	} else if (accion == "UpdateName") {
+		if _, ok := DATA[planeta][ciudad]; ok {
+
+			aux_splitted := strings.Fields(res)
+			new_ciudad := aux_splitted[2]
+
+			delete(DATA[planeta], ciudad)
+
+			if _, ok := DATA[planeta]; !ok {
+				// DATA[planeta][ciudad] does not exist -- create it!
+				DATA[planeta] = make(map[string]int)
+			}
+	
+			DATA[planeta][new_ciudad] = habitantes
+		}
+
+	} else if (accion == "UpdateNumber") {
+		if _, ok := DATA[planeta][ciudad]; ok {
+			DATA[planeta][ciudad] = habitantes
+		}
 	} else {
-		return ultimoReloj.Z 
+		log.Printf("Comando invalido")
 	}
 }
 
 var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+var DATA map[string]map[string]int
 
 func main() {
+	DATA = make(map[string]map[string]int)
 	Conectar()
 	
 	for {

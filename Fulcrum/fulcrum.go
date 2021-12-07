@@ -9,6 +9,7 @@ import (
 	"strconv"
 	"fmt"
 	"net"
+	"os"
 )
 
 const (
@@ -32,42 +33,164 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 	//Si el servidor previo es igual al servidor actual, es imposible que se lean datos desactualizados
 	//Si los servidores son distintos pero reloj_actual[servidor previo] < reloj_previo[servidor previo], los datos están desactualizado
 	if(indice_servidor != in.FServidor){
-		if(reloj.X < in.FReloj.X || reloj.Y < in.FReloj.Y || reloj.Z < in.FReloj.Z){
+		if(!(reloj.X >= in.FReloj.X && reloj.Y >= in.FReloj.Y && reloj.Z >= in.FReloj.Z)){
+			log.Printf("---------INCONSISTENCIA DETECTADA---------")
+			
 			//HACER MERGE
 
-
 			//PROPAGAR CAMBIOS
+			
+			log.Printf("---------INCONSISTENCIA RESUELTA---------")
+			//ClearLogs()
 		}
-	} 
+	}
+	log.Printf("COMANDO RECIBIDO:")
+	log.Printf(in.GetFCommand())
 
 	//HACER COMANDO
 	splitted := strings.Fields(in.GetFCommand())
+	var resultado string
 
 	if(splitted[0] == "AddCity") {
-
+		//AddCity nombre_planeta nombre_ciudad [nuevo_valor]
+		
 		splitted = append(splitted, "0")
-		habitantes, _ := strconv.Atoi(splitted[2])
+		habitantes, _ := strconv.Atoi(splitted[3])
+		
 		if( !ComandoAddCity(splitted[1], splitted[2], habitantes) ) {
 			log.Printf("CIUDAD YA EXISTIA EN ESE PLANETA POR LO QUE NO SE HIZO COMANDO:\n")
-			log.Printf(in.GetFCommand())
+			resultado = "ERROR"
+		} else {
+			resultado = splitted[1] + " " + splitted[2] + " " + strconv.Itoa(DATA[splitted[1]][splitted[2]])
+			AumentarReloj()
 		}
+	}else if(splitted[0] == "DeleteCity"){
+		//DeleteCity nombre_planeta nombre_ciudad
+		if( !ComandoDeleteCity(splitted[1], splitted[2]) ) {
+			log.Printf("CIUDAD NO EXISTIA EN ESE PLANETA POR LO QUE NO SE HIZO COMANDO:\n")
+			resultado = "ERROR"
+		} else {
+			resultado = "Deleted " + splitted[1] + " " + splitted[2]
+			AumentarReloj()
+		}
+	}else if(splitted[0] == "UpdateName"){
+		//UpdateName nombre_planeta nombre_ciudad nuevo_valor
+		if( !ComandoUpdateName(splitted[1], splitted[2], splitted[3]) ) {
+			log.Printf("CIUDAD NO EXISTIA EN ESE PLANETA POR LO QUE NO SE HIZO COMANDO:\n")
+			resultado = "ERROR"
+		} else {
+			AumentarReloj()
+			resultado = splitted[1] + " " + splitted[3] + " " + strconv.Itoa(DATA[splitted[1]][splitted[3]])
+		}
+	}else if(splitted[0] == "UpdateNumber"){
+		//UpdateNumber nombre_planeta nombre_ciudad nuevo_valor
+		habitantes, _ := strconv.Atoi(splitted[3])
+		if( !ComandoUpdateNumber(splitted[1], splitted[2], habitantes) ) {
+			log.Printf("CIUDAD NO EXISTIA EN ESE PLANETA POR LO QUE NO SE HIZO COMANDO:\n")
+			resultado = "ERROR"
+		} else {
+			AumentarReloj()
+			resultado = splitted[1] + " " + splitted[2] + " " + strconv.Itoa(DATA[splitted[1]][splitted[2]])
+		}
+	}else{
+		//Se murió
+		resultado = "ERROR"
 	}
 
-	AumentarReloj()
+	if(resultado != "ERROR") {
+		WriteLog(in.GetFCommand())
+	}
 
-	return &grpc_fulcrum.F_To_Informante{ FReloj: &reloj, FLog: in.FCommand }, nil
+	log.Printf("----------------")
+	PrintDATA()
+
+	return &grpc_fulcrum.F_To_Informante{ FReloj: &reloj, FLog: resultado }, nil
+}
+ 
+/*func CheckPlanet(planeta string) bool{
+	//Retorna verdadero si existe el planeta en el diccionario Data
+	if _, ok := DATA[planeta]; ok {
+		// DATA[planeta] existe
+		return true
+	}
+
+	return false
+}*/
+
+func CheckCity(planeta string, ciudad string) bool{
+	//Retorna verdadero si existe la ciudad en el planeta en el diccionario Data
+	if _, ok := DATA[planeta][ciudad]; ok {
+		// DATA[planeta][ciudad] existe
+		return true
+	}
+
+	return false
 }
 
 func ComandoAddCity(planeta string, ciudad string, habitantes int) bool{
+	//Agrega una ciudad a un planeta si no existía y retorna true, si ya existía, retorna false
 
 	if _, ok := DATA[planeta]; !ok {
-		// DATA[planeta][ciudad] does not exist -- create it!
+		// DATA[planeta] no existe, se crea
 		DATA[planeta] = make(map[string]int)
-	} else {
+	}
+	if CheckCity(planeta, ciudad) {
+		// DATA[planeta][ciudad] no existe, se crea
 		return false
 	}
 
 	DATA[planeta][ciudad] = habitantes
+
+	return true
+}
+
+func ComandoDeleteCity(planeta string, ciudad string) bool{
+	//Elimina una ciudad a un planeta y retorna true, si no existía, retorna false
+
+	if !CheckCity(planeta, ciudad) {
+		// DATA[planeta][ciudad] no existe
+		return false
+	} else {
+		// DATA[planeta][ciudad] existe, se borra
+		delete(DATA[planeta], ciudad)
+	}
+	
+	return true
+}
+
+func ComandoUpdateName(planeta string, ciudad string, ciudad_new string) bool{
+	//Actualiza el nombre de una ciudad y retorna true, si no existía, retorna false
+	//También, si una ciudad con el nuevo nombre ya existía, no hace nada y retorna false
+	
+	if !CheckCity(planeta, ciudad) {
+		// DATA[planeta][ciudad] no existe
+		return false
+	} else {
+		// DATA[planeta][ciudad] existe	
+		if !CheckCity(planeta, ciudad_new) {
+			// DATA[planeta][ciudad_new] no existe
+			aux := DATA[planeta][ciudad]
+			ComandoDeleteCity(planeta, ciudad)
+			ComandoAddCity(planeta, ciudad_new, aux)
+		}else{
+			return false
+		}
+	}
+
+	return true
+}
+
+func ComandoUpdateNumber(planeta string, ciudad string, habitantes int) bool{
+	//Actualiza la cantidad de rebeldes de una ciudad y retorna true, si no existía retorna false
+
+	if !CheckCity(planeta, ciudad) {
+		// DATA[planeta][ciudad] no existe
+		return false
+	} else {
+		// DATA[planeta][ciudad] existe, se actualiza
+
+		DATA[planeta][ciudad] = habitantes
+	}
 
 	return true
 }
@@ -94,6 +217,48 @@ func AumentarReloj() {
 	}
 }
 
+func PrintDATA(){
+	log.Printf("_______DATA________")
+	for planeta, dic2 := range DATA {
+		for ciudad, habitantes := range dic2 {
+			h := strconv.Itoa(habitantes)
+			toPrint := planeta + " " + ciudad + " " + h
+        	log.Printf(toPrint)
+		}
+    }
+}
+
+func WriteLog(comando string, planeta string) {
+	//Escribir comando recibido en los logs
+
+	index := strconv.Itoa(int(indice_servidor))
+	//file, err := os.Create("jugador_"+playerId+"__ronda_1.txt")
+	file, err := os.OpenFile("./" + index + "/Log_"+planeta+".txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+
+	if err != nil {
+        log.Fatal(err)
+    }
+    
+    defer file.Close()
+
+	if _, err := file.WriteString(comando); err != nil {
+		log.Fatalf("Error escribiendo en logs.txt")
+		
+		return
+	}
+}
+
+func ClearLogs(){
+	//Borrar logs.txt luego de hacer un merge
+	index := strconv.Itoa(int(indice_servidor))
+	
+	for planeta, dic2 := range DATA {
+		if err := os.Truncate("./" + index + "/Log_"+planeta+".txt", 0); err != nil {
+			log.Printf("Error al eliminar contenidos de un archivo: %v", err)
+		}
+    }
+}
+
 //Direcciones de los servidores fulcrum
 var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
 var indice_servidor int64
@@ -106,9 +271,13 @@ func main() {
 
 	//Recibir 1 2 o 3 y abrir un server distinto
 	log.Printf("Ingrese servidor a iniciar (0|1|2)")
-	fmt.Scanf("%i", &indice_servidor)
+	fmt.Scanf("%d", &indice_servidor)
 	
-	lis, err := net.Listen("tcp", servers[indice_servidor])
+	servidor := servers[indice_servidor]
+
+	log.Printf("Escuchando en " + servidor)
+
+	lis, err := net.Listen("tcp", servidor)
 	if err != nil {
 		log.Fatalf("failed to listen: %v", err)
 		return
