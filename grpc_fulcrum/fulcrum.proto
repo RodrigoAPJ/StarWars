@@ -11,8 +11,8 @@ service Fulcrum {
 }
 
 message F_FromLeia {
-    F_Planeta f_planeta = 1;
-    F_Ciudad f_ciudad = 2;
+    string F_LeiaMSG = 1;
+    F_Reloj f_reloj = 2;
 }
 
 message F_From_Informante{
@@ -32,20 +32,8 @@ message F_Merge_Data{
 }
 
 message F_ToLeia {
-    F_Rebeldes f_rebeldes = 1;
+    int64 f_rebeldes = 1;
     F_Reloj f_reloj = 2;
-}
-
-message F_Planeta {
-    string planeta = 1;
-}
-
-message F_Ciudad {
-    string ciudad = 1;
-}
-
-message F_Rebeldes {
-    int64 cantidad = 1;
 }
 
 message F_Reloj {

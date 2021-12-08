@@ -19,8 +19,7 @@ const (
 )
 
 var c grpc_broker.BrokerClient
-var ultimoServidor int64 = 0
-var ultimoReloj = grpc_fulcrum.F_Reloj {X:0, Y:0, Z:0}
+var ultimoServidor int64 = -1
 
 func Conectar(){
 	// Set up a connection to the server.
@@ -66,43 +65,47 @@ func SendComm(){  //Mandar comando al broker para recibir una direccion de un se
 
 	f := ConectarFulcrum(servidor)
 	//Mandar comando ahora a servers{r.id}
-	res, errr := f.F_SendCommand(ctx, &grpc_fulcrum.F_From_Informante{FCommand : linea, FReloj: &ultimoReloj, FServidor: ultimoServidor})
+
+	aux_splitted := strings.Fields(linea)
+	relojAMandar := grpc_fulcrum.F_Reloj{X:0, Y:0, Z:0}
+	if _, ok := DATA_Reloj[aux_splitted[1]]; ok {
+		relojAMandar = DATA_Reloj[aux_splitted[1]]
+	}
+
+	res, errr := f.F_SendCommand(ctx, &grpc_fulcrum.F_From_Informante{FCommand : linea, FReloj: &relojAMandar, FServidor: ultimoServidor})
 
 	if errr != nil {
         log.Fatal(errr)
     }
 
 	ultimoServidor = r.Id
-	ultimoReloj = *(res.FReloj)
+
+	splitted := strings.Fields(res.FLog)
+	planeta    := splitted[0]
+	DATA_Reloj[planeta] = grpc_fulcrum.F_Reloj{ X:(*(res.FReloj)).X, Y:(*(res.FReloj)).Y, Z:(*(res.FReloj)).Z}
 
 	log.Printf("-------------------------------")
 	log.Printf("Log recibido:")
 	log.Printf(res.FLog)
 
 	ModificarDATA(linea, res.FLog)
-
 	PrintDATA()
 }
 
 func PrintDATA(){
 	log.Printf("_______DATA________")
 	for planeta, dic2 := range DATA {
+		log.Printf("RELOJ: ")
+		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].X)))
+		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Y)))
+		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Z)))
+
 		for ciudad, habitantes := range dic2 {
 			h := strconv.Itoa(habitantes)
 			toPrint := planeta + " " + ciudad + " " + h
         	log.Printf(toPrint)
 		}
     }
-}
-
-func GetReloj(indice int64) int64 {
-	if(indice == 1){
-		return ultimoReloj.X 
-	} else if(indice == 2) {
-		return ultimoReloj.Y
-	} 
-
-	return ultimoReloj.Z
 }
 
 func ModificarDATA(comando string, res string) {
@@ -160,9 +163,12 @@ func ModificarDATA(comando string, res string) {
 
 var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
 var DATA map[string]map[string]int
+var DATA_Reloj map[string]grpc_fulcrum.F_Reloj
 
 func main() {
 	DATA = make(map[string]map[string]int)
+	DATA_Reloj = make(map[string]grpc_fulcrum.F_Reloj)
+
 	Conectar()
 	
 	for {
