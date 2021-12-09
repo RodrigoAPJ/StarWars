@@ -106,7 +106,7 @@ func (s *server) F_GetNumberRebels(ctx context.Context, in *grpc_fulcrum.F_FromL
 
 			index := strconv.Itoa(int(indice_servidor))
 
-			file, err := os.Open("./" + index + "/"+planeta+".txt")
+			file, err := os.Open("./Fulcrum/" + index + "/"+planeta+".txt")
 			if err != nil {
 				log.Fatalf("failed to open")
 			
@@ -232,7 +232,7 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 
 			index := strconv.Itoa(int(indice_servidor))
 
-			file, err := os.Open("./" + index + "/"+planeta+".txt")
+			file, err := os.Open("./Fulcrum/" + index + "/"+planeta+".txt")
 			if err != nil {
 				log.Fatalf("failed to open")
 		  
@@ -457,11 +457,11 @@ func (s *server) F_Request(ctx context.Context, in *grpc_fulcrum.Fantasma) (*grp
 	index := strconv.Itoa(int(indice_servidor))
 	if _, err := os.Stat("./"+index+"/"+in.Planeta + "_Log.txt"); err != nil {
 		// path/to/whatever not exists
-		log.Printf("El archivo ./"+in.Planeta + "_Log.txt no existe")
+		log.Printf("El archivo ./Fulcrum/"+in.Planeta + "_Log.txt no existe")
 		return &grpc_fulcrum.F_Merge_Data{FReloj: &reloj, FLog: ""}, nil
 	} 
 	
-    file, err := os.Open("./"+index+"/"+in.Planeta + "_Log.txt")
+    file, err := os.Open("./Fulcrum/"+index+"/"+in.Planeta + "_Log.txt")
   
     if err != nil {
         log.Fatalf("Error abriendo archivo")
@@ -567,7 +567,7 @@ func WriteLog(comando string, planeta string) {
 
 	index := strconv.Itoa(int(indice_servidor))
 	//file, err := os.Create("jugador_"+playerId+"__ronda_1.txt")
-	file, err := os.OpenFile("./" + index + "/"+planeta+"_Log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	file, err := os.OpenFile("./Fulcrum/" + index + "/"+planeta+"_Log.txt", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 
 	if err != nil {
         log.Fatal(err)
@@ -587,7 +587,7 @@ func ClearLog(planeta string){
 	index := strconv.Itoa(int(indice_servidor))
 	
 	//Crear el archivo o limpiarlo si ya existia
-	file, err := os.OpenFile("./" + index + "/"+planeta+"_Log.txt", os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
+	file, err := os.OpenFile("./Fulcrum/" + index + "/"+planeta+"_Log.txt", os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
 
 	if err != nil {
         log.Fatal(err)
@@ -606,7 +606,7 @@ func UpdatePlanetFile(planeta string) {
 	index := strconv.Itoa(int(indice_servidor))
 
 	//Crear el archivo o limpiarlo si ya existia
-	file, err := os.OpenFile("./" + index + "/"+planeta+".txt", os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
+	file, err := os.OpenFile("./Fulcrum/" + index + "/"+planeta+".txt", os.O_WRONLY | os.O_CREATE | os.O_TRUNC, 0644)
 
 	if err != nil {
         log.Fatal(err)
@@ -693,7 +693,7 @@ func Eventual() {
 
 			index := strconv.Itoa(int(indice_servidor))
 
-			file, err := os.Open("./" + index + "/"+planeta+".txt")
+			file, err := os.Open("./Fulcrum/" + index + "/"+planeta+".txt")
 			if err != nil {
 				log.Fatalf("failed to open")
 			}
