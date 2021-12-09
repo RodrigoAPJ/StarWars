@@ -123,12 +123,12 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 			DATA_Reloj[planeta] = nuevo_reloj
 
 			//aplicar los comandos de los logs de servidor1 y servidor2 a DATA
-			split_RES1 := strings.Split(res1.FLog, "\n")
+			split_RES1 := strings.Split(res1.FLog, "*")
 			for _, linea := range split_RES1 {
 				ApplyCommand(linea)
 			}
 
-			split_RES2 := strings.Split(res2.FLog, "\n")
+			split_RES2 := strings.Split(res2.FLog, "*")
 			for _, linea := range split_RES2 {
 				ApplyCommand(linea)
 			}
@@ -150,11 +150,10 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 		  
 			for scanner.Scan() {
 				registro += scanner.Text()
-				registro += "\n"
+				registro += "*"
+				log.Printf("Armando registro: "+registro)
 			}
 			file.Close()
-
-			log.Printf("Mandando registro: "+registro)
 
 			_, err3 := c1.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro}) //mandar DATA_Reloj[planeta] y DATA[planeta]
 			_, err4 := c2.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro})
@@ -371,7 +370,7 @@ func (s *server) F_Request(ctx context.Context, in *grpc_fulcrum.Fantasma) (*grp
   
     for scanner.Scan() {
         text += scanner.Text()
-		text += "\n"
+		text += "*"
     }
     file.Close()
   
@@ -386,10 +385,10 @@ func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*g
 	//Cuando esta funcion sea llamada se debe reemplazar DATA[planeta] por el recibido por input
 	//borrar DATA[planeta]
 	log.Printf("DEBUG-----------")
-	log.Printf(in.FLog)
+	fmt.Println(in.FLog)
 	log.Printf("DEBUG-----------")
-	split := strings.Split(in.FLog, "\n")
-	planeta := strings.Split(split[0], " ")[0]
+	split := strings.Split(in.FLog, "*")
+	planeta := strings.Fields(split[0])[0]
 
 	if _, ok := DATA[planeta]; ok {
 		// DATA[planeta] existe
@@ -400,10 +399,21 @@ func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*g
 		}
 	}
 	
-	for _, linea := range split {
-		elementos := strings.Split(linea, " ")
+	for i, linea := range split {
+		if(linea == ""){
+			continue
+		}
+		fmt.Println("INDICE: ", i)
+		fmt.Println("LINEA: ", linea)
+		elementos := strings.Fields(linea)
 
-		num, _ := strconv.Atoi(elementos[2])
+		log.Printf("---ELEMENTOS---")
+		fmt.Println(elementos)
+		log.Printf("--------")
+
+		aux := elementos[2]
+		log.Printf("Yapo :C   "+aux)
+		num, _ := strconv.Atoi(aux)
 		
 		if _, ok := DATA[elementos[0]]; !ok {
 			DATA[elementos[0]] = make(map[string]int)
@@ -416,6 +426,7 @@ func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*g
 	//Actualizar los registros de ese planeta(con UpdatePlanetFile(planeta)) y llamar a ClearLog(planeta)
 	UpdatePlanetFile(planeta)
 	ClearLog(planeta)
+	PrintDATA()
 
 	return &grpc_fulcrum.Fantasma{Planeta: "1"}, nil
 }
