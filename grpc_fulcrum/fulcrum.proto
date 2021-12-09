@@ -43,5 +43,5 @@ message F_Reloj {
 }
 
 message Fantasma {
-    string fantasma = 1;
+    string planeta = 2;
 }
