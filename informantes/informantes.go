@@ -159,7 +159,7 @@ func ModificarDATA(comando string, res string) {
 	}
 }
 
-var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+var servers = [3]string{"10.6.43.105:50053", "10.6.43.106:50052", "10.6.43.107:50051"}
 var DATA map[string]map[string]int
 var DATA_Reloj map[string]grpc_fulcrum.F_Reloj
 
