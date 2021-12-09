@@ -12,6 +12,7 @@ import (
 	"os"
 	"math"
 	"bufio"
+	"time"
 )
 
 const (
@@ -39,14 +40,103 @@ func (s *server) F_GetNumberRebels(ctx context.Context, in *grpc_fulcrum.F_FromL
 	if(strconv.Itoa(int(indice_servidor)) != inServidor && inServidor != "-1"){
 
 		if(!(reloj.X >= in.FReloj.X && reloj.Y >= in.FReloj.Y && reloj.Z >= in.FReloj.Z)){
+			
+			
 			log.Printf("---------INCONSISTENCIA DETECTADA---------")
 			
+			//Conectarse a los otros servidores
+						
+			var c1 grpc_fulcrum.FulcrumClient
+			var c2 grpc_fulcrum.FulcrumClient
+
+			if (indice_servidor == 0){
+				c1 = ConectarFulcrum(servers[1])
+				c2 = ConectarFulcrum(servers[2])
+			}else if (indice_servidor == 1){
+				c1 = ConectarFulcrum(servers[0])
+				c2 = ConectarFulcrum(servers[2])
+			}else{
+				c1 = ConectarFulcrum(servers[0])
+				c2 = ConectarFulcrum(servers[1])
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
+    		defer cancel()	
+			res1, err1 := c1.F_Request(ctx, &grpc_fulcrum.Fantasma{Planeta: planeta})
+			if err1 != nil {
+				log.Fatal(err1)
+			}
+			res2, err2 := c2.F_Request(ctx, &grpc_fulcrum.Fantasma{Planeta: planeta})
+			if err2 != nil {
+				log.Fatal(err2)
+			}
+
+			log.Printf("LOG1: " + res1.FLog)
+			log.Printf("LOG2: " + res2.FLog)
+
+			fmt.Println("RELOJ1: ", strconv.Itoa(int(res1.FReloj.X)), strconv.Itoa(int(res1.FReloj.Y)), strconv.Itoa(int(res1.FReloj.Z)))
+			fmt.Println("RELOJ2: ", strconv.Itoa(int(res2.FReloj.X)), strconv.Itoa(int(res2.FReloj.Y)), strconv.Itoa(int(res2.FReloj.Z)))
+
 			//HACER MERGE
 
+			//mezclar los relojes(X=max(s0.X, s1.X, s2.X), Y=....)
+			x := int64(math.Max(float64(DATA_Reloj[planeta].X), math.Max(float64(res1.FReloj.X), float64(res2.FReloj.X))))
+			y := int64(math.Max(float64(DATA_Reloj[planeta].Y), math.Max(float64(res1.FReloj.Y), float64(res2.FReloj.Y))))
+			z := int64(math.Max(float64(DATA_Reloj[planeta].Z), math.Max(float64(res1.FReloj.Z), float64(res2.FReloj.Z))))
+
+			fmt.Println("NUEVO X,Y,Z: ",strconv.Itoa(int(x))," ",strconv.Itoa(int(y))," ",strconv.Itoa(int(z)))
+
+			nuevo_reloj := grpc_fulcrum.F_Reloj{X: x, Y: y, Z: z}
+			DATA_Reloj[planeta] = nuevo_reloj
+
+			//aplicar los comandos de los logs de servidor1 y servidor2 a DATA
+			split_RES1 := strings.Split(res1.FLog, "*")
+			for _, linea := range split_RES1 {
+				ApplyCommand(linea, false)
+			}
+
+			split_RES2 := strings.Split(res2.FLog, "*")
+			for _, linea := range split_RES2 {
+				ApplyCommand(linea, false)
+			}
+
+			UpdatePlanetFile(planeta)
+
 			//PROPAGAR CAMBIOS
+
+			index := strconv.Itoa(int(indice_servidor))
+
+			file, err := os.Open("./" + index + "/"+planeta+".txt")
+			if err != nil {
+				log.Fatalf("failed to open")
+			
+			}
+			scanner := bufio.NewScanner(file)
+			scanner.Split(bufio.ScanLines)
+			var registros []string
+			
+			for scanner.Scan() {
+				registros = append(registros, scanner.Text())
+			}
+			file.Close()
+
+			var registro string = ""
+
+			for _, each_line := range registros {
+				registro = registro + each_line + "*"
+			}
+
+			_, err3 := c1.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro}) //mandar DATA_Reloj[planeta] y DATA[planeta]
+			_, err4 := c2.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro})
+			if err3 != nil {
+				log.Fatal(err3)
+			}
+			if err4 != nil {
+				log.Fatal(err4)
+			}
 			
 			log.Printf("---------INCONSISTENCIA RESUELTA---------")
-			//ClearLog(splitted[1])
+			ClearLog(planeta)
 		}
 		
 	}
@@ -107,10 +197,11 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 				log.Fatal(err2)
 			}
 
-			log.Printf("LOG1---------------------")
-			log.Printf(res1.FLog)
-			log.Printf("LOG2---------------------")
-			log.Printf(res2.FLog)
+			log.Printf("LOG1: " + res1.FLog)
+			log.Printf("LOG2: " + res2.FLog)
+
+			fmt.Println("RELOJ1: ", strconv.Itoa(int(res1.FReloj.X)), strconv.Itoa(int(res1.FReloj.Y)), strconv.Itoa(int(res1.FReloj.Z)))
+			fmt.Println("RELOJ2: ", strconv.Itoa(int(res2.FReloj.X)), strconv.Itoa(int(res2.FReloj.Y)), strconv.Itoa(int(res2.FReloj.Z)))
 
 			//HACER MERGE
 
@@ -119,18 +210,20 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 			y := int64(math.Max(float64(DATA_Reloj[planeta].Y), math.Max(float64(res1.FReloj.Y), float64(res2.FReloj.Y))))
 			z := int64(math.Max(float64(DATA_Reloj[planeta].Z), math.Max(float64(res1.FReloj.Z), float64(res2.FReloj.Z))))
 
+			fmt.Println("NUEVO X,Y,Z: ",strconv.Itoa(int(x))," ",strconv.Itoa(int(y))," ",strconv.Itoa(int(z)))
+
 			nuevo_reloj := grpc_fulcrum.F_Reloj{X: x, Y: y, Z: z}
 			DATA_Reloj[planeta] = nuevo_reloj
 
 			//aplicar los comandos de los logs de servidor1 y servidor2 a DATA
 			split_RES1 := strings.Split(res1.FLog, "*")
 			for _, linea := range split_RES1 {
-				ApplyCommand(linea)
+				ApplyCommand(linea, false)
 			}
 
 			split_RES2 := strings.Split(res2.FLog, "*")
 			for _, linea := range split_RES2 {
-				ApplyCommand(linea)
+				ApplyCommand(linea, false)
 			}
 
 			UpdatePlanetFile(planeta)
@@ -146,14 +239,18 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 			}
 			scanner := bufio.NewScanner(file)
 			scanner.Split(bufio.ScanLines)
-			var registro string
+			var registros []string
 		  
 			for scanner.Scan() {
-				registro += scanner.Text()
-				registro += "*"
-				log.Printf("Armando registro: "+registro)
+				registros = append(registros, scanner.Text())
 			}
 			file.Close()
+
+			var registro string = ""
+
+			for _, each_line := range registros {
+				registro = registro + each_line + "*"
+			}
 
 			_, err3 := c1.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro}) //mandar DATA_Reloj[planeta] y DATA[planeta]
 			_, err4 := c2.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro})
@@ -168,17 +265,15 @@ func (s *server) F_SendCommand(ctx context.Context, in *grpc_fulcrum.F_From_Info
 			ClearLog(planeta)
 		}
 	}
-	log.Printf("COMANDO RECIBIDO")
-	log.Printf(in.GetFCommand())
+	log.Printf("COMANDO RECIBIDO: " + in.GetFCommand())
 
-	resultado := ApplyCommand(in.GetFCommand())
+	resultado := ApplyCommand(in.GetFCommand(), true)
 
 	if(resultado != "ERROR") {
 		WriteLog(in.GetFCommand(), splitted[1])
 		UpdatePlanetFile(splitted[1])
 	}
 
-	log.Printf("----------------")
 	PrintDATA()
 
 	aux := DATA_Reloj[splitted[1]]
@@ -199,7 +294,7 @@ func ConectarFulcrum(servidor string) grpc_fulcrum.FulcrumClient {
 	return grpc_fulcrum.NewFulcrumClient(conn)
 }
  
-func ApplyCommand(com string) string{
+func ApplyCommand(com string, cambiarReloj bool) string{
 	if(com == "") {
 		return "ERROR"
 	}
@@ -224,7 +319,9 @@ func ApplyCommand(com string) string{
 			res = "ERROR"
 		} else {
 			res = split[1] + " " + split[2] + " " + strconv.Itoa(DATA[split[1]][split[2]])
-			DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			if(cambiarReloj) {
+				DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			}
 		}
 	}else if(split[0] == "DeleteCity"){
 		//DeleteCity nombre_planeta nombre_ciudad
@@ -233,7 +330,9 @@ func ApplyCommand(com string) string{
 			res = "ERROR"
 		} else {
 			res = "Deleted " + split[1] + " " + split[2]
-			DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			if(cambiarReloj) {
+				DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			}
 		}
 	}else if(split[0] == "UpdateName"){
 		//UpdateName nombre_planeta nombre_ciudad nuevo_valor
@@ -242,7 +341,9 @@ func ApplyCommand(com string) string{
 			res = "ERROR"
 		} else {
 			res = split[1] + " " + split[3] + " " + strconv.Itoa(DATA[split[1]][split[3]])
-			DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			if(cambiarReloj) {
+				DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			}
 		}
 	}else if(split[0] == "UpdateNumber"){
 		//UpdateNumber nombre_planeta nombre_ciudad nuevo_valor
@@ -252,7 +353,9 @@ func ApplyCommand(com string) string{
 			res = "ERROR"
 		} else {
 			res = split[1] + " " + split[2] + " " + strconv.Itoa(DATA[split[1]][split[2]])
-			DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			if(cambiarReloj) {
+				DATA_Reloj[split[1]] = AumentarReloj(reloj)
+			}
 		}
 	}else{
 		//Se murió
@@ -366,15 +469,21 @@ func (s *server) F_Request(ctx context.Context, in *grpc_fulcrum.Fantasma) (*grp
   
     scanner := bufio.NewScanner(file)
     scanner.Split(bufio.ScanLines)
-    var text string
+    
+	var registros []string
+		  
+	for scanner.Scan() {
+		registros = append(registros, scanner.Text())
+	}
+	file.Close()
+
+	var registro string = ""
+
+	for _, each_line := range registros {
+		registro = registro + each_line + "*"
+	}
   
-    for scanner.Scan() {
-        text += scanner.Text()
-		text += "*"
-    }
-    file.Close()
-  
-	return &grpc_fulcrum.F_Merge_Data{FReloj: &reloj, FLog: text}, nil
+	return &grpc_fulcrum.F_Merge_Data{FReloj: &reloj, FLog: registro}, nil
 }
 
 func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*grpc_fulcrum.Fantasma, error) {
@@ -384,9 +493,7 @@ func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*g
 
 	//Cuando esta funcion sea llamada se debe reemplazar DATA[planeta] por el recibido por input
 	//borrar DATA[planeta]
-	log.Printf("DEBUG-----------")
-	fmt.Println(in.FLog)
-	log.Printf("DEBUG-----------")
+	log.Printf("Cambios recibidos en F_Merge: " + in.FLog)
 	split := strings.Split(in.FLog, "*")
 	planeta := strings.Fields(split[0])[0]
 
@@ -407,12 +514,11 @@ func (s *server) F_Merge(ctx context.Context, in *grpc_fulcrum.F_Merge_Data) (*g
 		fmt.Println("LINEA: ", linea)
 		elementos := strings.Fields(linea)
 
-		log.Printf("---ELEMENTOS---")
+		fmt.Println("---ELEMENTOS---")
 		fmt.Println(elementos)
-		log.Printf("--------")
+		fmt.Println("--------")
 
 		aux := elementos[2]
-		log.Printf("Yapo :C   "+aux)
 		num, _ := strconv.Atoi(aux)
 		
 		if _, ok := DATA[elementos[0]]; !ok {
@@ -443,19 +549,17 @@ func AumentarReloj(reloj grpc_fulcrum.F_Reloj) grpc_fulcrum.F_Reloj {
 }
 
 func PrintDATA(){
-	log.Printf("_______DATA________")
+	fmt.Println("_______DATA________")
 	for planeta, dic2 := range DATA {
-		log.Printf("RELOJ: ")
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].X)))
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Y)))
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Z)))
+		fmt.Println("Planeta " + planeta)
+		fmt.Println("RELOJ: ", strconv.Itoa(int(DATA_Reloj[planeta].X)), strconv.Itoa(int(DATA_Reloj[planeta].Y)), strconv.Itoa(int(DATA_Reloj[planeta].Z)))
 
 		for ciudad, habitantes := range dic2 {
-			h := strconv.Itoa(habitantes)
-			toPrint := planeta + " " + ciudad + " " + h
-        	log.Printf(toPrint)
+        	fmt.Println(planeta + " " + ciudad + " " + strconv.Itoa(habitantes))
 		}
+		fmt.Println("__________________")
     }
+	fmt.Println("\n")
 }
 
 func WriteLog(comando string, planeta string) {
@@ -512,7 +616,7 @@ func UpdatePlanetFile(planeta string) {
 
 	for ciudad, habitantes := range DATA[planeta] {
 		h := strconv.Itoa(habitantes)
-		toWrite := planeta + " " + ciudad + " " + h
+		toWrite := planeta + " " + ciudad + " " + h + "\n"
 		if _, err := file.WriteString(toWrite); err != nil {
 			log.Fatalf("Error escribiendo en registro planetario de " + planeta)
 			
@@ -521,8 +625,109 @@ func UpdatePlanetFile(planeta string) {
 	}
 }
 
+
+func Eventual() {
+	
+	for {
+		time.Sleep(120 * time.Second)
+		
+		for planeta, _ := range DATA {
+			//Conectarse a los otros servidores			
+			var c1 grpc_fulcrum.FulcrumClient
+			var c2 grpc_fulcrum.FulcrumClient
+
+			if (indice_servidor == 0){
+				c1 = ConectarFulcrum(servers[1])
+				c2 = ConectarFulcrum(servers[2])
+			}else if (indice_servidor == 1){
+				c1 = ConectarFulcrum(servers[0])
+				c2 = ConectarFulcrum(servers[2])
+			}else{
+				c1 = ConectarFulcrum(servers[0])
+				c2 = ConectarFulcrum(servers[1])
+			}
+
+			ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
+    		defer cancel()
+			res1, err1 := c1.F_Request(ctx, &grpc_fulcrum.Fantasma{Planeta: planeta})
+			if err1 != nil {
+				log.Fatal(err1)
+			}
+			res2, err2 := c2.F_Request(ctx, &grpc_fulcrum.Fantasma{Planeta: planeta})
+			if err2 != nil {
+				log.Fatal(err2)
+			}
+
+			//log.Printf("LOG1: " + res1.FLog)
+			//log.Printf("LOG2: " + res2.FLog)
+
+			//fmt.Println("RELOJ1: ", strconv.Itoa(int(res1.FReloj.X)), strconv.Itoa(int(res1.FReloj.Y)), strconv.Itoa(int(res1.FReloj.Z)))
+			//fmt.Println("RELOJ2: ", strconv.Itoa(int(res2.FReloj.X)), strconv.Itoa(int(res2.FReloj.Y)), strconv.Itoa(int(res2.FReloj.Z)))
+
+			//HACER MERGE
+
+			//mezclar los relojes(X=max(s0.X, s1.X, s2.X), Y=....)
+			x := int64(math.Max(float64(DATA_Reloj[planeta].X), math.Max(float64(res1.FReloj.X), float64(res2.FReloj.X))))
+			y := int64(math.Max(float64(DATA_Reloj[planeta].Y), math.Max(float64(res1.FReloj.Y), float64(res2.FReloj.Y))))
+			z := int64(math.Max(float64(DATA_Reloj[planeta].Z), math.Max(float64(res1.FReloj.Z), float64(res2.FReloj.Z))))
+
+			//fmt.Println("NUEVO X,Y,Z: ",strconv.Itoa(int(x))," ",strconv.Itoa(int(y))," ",strconv.Itoa(int(z)))
+
+			nuevo_reloj := grpc_fulcrum.F_Reloj{X: x, Y: y, Z: z}
+			DATA_Reloj[planeta] = nuevo_reloj
+
+			//aplicar los comandos de los logs de servidor1 y servidor2 a DATA
+			split_RES1 := strings.Split(res1.FLog, "*")
+			for _, linea := range split_RES1 {
+				ApplyCommand(linea, false)
+			}
+
+			split_RES2 := strings.Split(res2.FLog, "*")
+			for _, linea := range split_RES2 {
+				ApplyCommand(linea, false)
+			}
+
+			UpdatePlanetFile(planeta)
+
+			//PROPAGAR CAMBIOS
+
+			index := strconv.Itoa(int(indice_servidor))
+
+			file, err := os.Open("./" + index + "/"+planeta+".txt")
+			if err != nil {
+				log.Fatalf("failed to open")
+			}
+			scanner := bufio.NewScanner(file)
+			scanner.Split(bufio.ScanLines)
+			var registros []string
+			
+			for scanner.Scan() {
+				registros = append(registros, scanner.Text())
+			}
+			file.Close()
+
+			var registro string = ""
+
+			for _, each_line := range registros {
+				registro = registro + each_line + "*"
+			}
+
+			_, err3 := c1.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro}) //mandar DATA_Reloj[planeta] y DATA[planeta]
+			_, err4 := c2.F_Merge(ctx, &grpc_fulcrum.F_Merge_Data{FReloj: &nuevo_reloj, FLog: registro})
+			if err3 != nil {
+				log.Fatal(err3)
+			}
+			if err4 != nil {
+				log.Fatal(err4)
+			}
+			
+			ClearLog(planeta)
+		}
+	}
+}
+
 //Direcciones de los servidores fulcrum
-var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+var servers = [3]string{"10.6.43.105:50053", "10.6.43.106:50052", "10.6.43.107:50051"}
 var indice_servidor int64
 
 var DATA map[string]map[string]int
@@ -549,6 +754,8 @@ func main() {
 
 	s := grpc.NewServer()
 	grpc_fulcrum.RegisterFulcrumServer(s, &server{})
+
+	go Eventual()
 
 	//ABAJO DE ESTE IF NADA
 	if err := s.Serve(lis); err != nil {

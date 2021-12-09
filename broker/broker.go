@@ -61,7 +61,7 @@ func ConectarFulcrum(servidor string) grpc_fulcrum.FulcrumClient {
 	return grpc_fulcrum.NewFulcrumClient(conn)
 }
 
-var servers = [3]string{"localhost:50051", "localhost:50052", "localhost:50053"}
+var servers = [3]string{"10.6.43.105:50053", "10.6.43.106:50052", "10.6.43.107:50051"}
 
 func main() {
 	rand.Seed(time.Now().UnixNano())

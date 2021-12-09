@@ -1,4 +1,0 @@
-export PATH="$PATH:$(go env GOPATH)/bin"
-
-cd grpc_pozo
-protoc -I ./ --go_out=./ --go-grpc_out=./ ./pozo.proto

@@ -22,10 +22,7 @@ var DATA_Reloj map[string]grpc_broker.Reloj
 var DATA map[string]map[string]int
 
 
-func SendComm(){  //Mandar comando al broker para recibir una direccion de un servidor Fulcrum
-	ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
-    defer cancel()
-	
+func SendComm(){  //Mandar comando al broker para recibir una direccion de un servidor Fulcrum	
 	//Comando: "GetNumberRebelds nombre_planeta nombre_ciudad"
 	comando := bufio.NewReader(os.Stdin)
 	linea, err := comando.ReadString('\n')
@@ -44,6 +41,9 @@ func SendComm(){  //Mandar comando al broker para recibir una direccion de un se
 
 	aux_uS := strconv.Itoa(int(ultimoServidor))
 	linea += " " + aux_uS
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
+    defer cancel()
     r, err := c.GetNumberRebels(ctx, &grpc_broker.FromLeia{ LeiaMSG: linea, Reloj: &relojAMandar})
     
     if err != nil {

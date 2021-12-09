@@ -10,7 +10,7 @@ import (
 	"bufio"
   	"os"
 	"strconv"
-	//"fmt"
+	"fmt"
 	"strings"
 )
 
@@ -47,11 +47,12 @@ func ConectarFulcrum(servidor string) grpc_fulcrum.FulcrumClient {
 }
 
 func SendComm(){  //Mandar comando al broker para recibir una direccion de un servidor Fulcrum
-	ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
-    defer cancel()
 	
 	comando := bufio.NewReader(os.Stdin)
 	linea, err := comando.ReadString('\n')
+
+	ctx, cancel := context.WithTimeout(context.Background(), 60 * time.Second)
+    defer cancel()
 
     r, err := c.SendCommand(ctx, &grpc_broker.Command{Command:linea})
     
@@ -95,10 +96,7 @@ func SendComm(){  //Mandar comando al broker para recibir una direccion de un se
 func PrintDATA(){
 	log.Printf("_______DATA________")
 	for planeta, dic2 := range DATA {
-		log.Printf("RELOJ: ")
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].X)))
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Y)))
-		log.Printf(strconv.Itoa(int(DATA_Reloj[planeta].Z)))
+		fmt.Println("RELOJ: ", strconv.Itoa(int(DATA_Reloj[planeta].X)), strconv.Itoa(int(DATA_Reloj[planeta].Y)), strconv.Itoa(int(DATA_Reloj[planeta].Z)))
 
 		for ciudad, habitantes := range dic2 {
 			h := strconv.Itoa(habitantes)
@@ -138,9 +136,9 @@ func ModificarDATA(comando string, res string) {
 
 	} else if (accion == "UpdateName") {
 		if _, ok := DATA[planeta][ciudad]; ok {
-
+			aux_habitantes := DATA[planeta][ciudad]
 			aux_splitted := strings.Fields(res)
-			new_ciudad := aux_splitted[2]
+			new_ciudad := aux_splitted[1]
 
 			delete(DATA[planeta], ciudad)
 
@@ -149,7 +147,7 @@ func ModificarDATA(comando string, res string) {
 				DATA[planeta] = make(map[string]int)
 			}
 	
-			DATA[planeta][new_ciudad] = habitantes
+			DATA[planeta][new_ciudad] = aux_habitantes
 		}
 
 	} else if (accion == "UpdateNumber") {
