@@ -13,7 +13,7 @@ import (
 )
 
 const (
-	address = "localhost:50054"
+	address = "10.6.43.108:50053"
 )
 
 var c grpc_broker.BrokerClient
