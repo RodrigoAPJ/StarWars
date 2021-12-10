@@ -455,9 +455,9 @@ func (s *server) F_Request(ctx context.Context, in *grpc_fulcrum.Fantasma) (*grp
 
 	//log := contenido de planeta_Log.txt
 	index := strconv.Itoa(int(indice_servidor))
-	if _, err := os.Stat("./"+index+"/"+in.Planeta + "_Log.txt"); err != nil {
+	if _, err := os.Stat("./Fulcrum/"+index+"/"+in.Planeta + "_Log.txt"); err != nil {
 		// path/to/whatever not exists
-		log.Printf("El archivo ./Fulcrum/"+in.Planeta + "_Log.txt no existe")
+		log.Printf("El archivo ./Fulcrum/"+index+"/"+in.Planeta + "_Log.txt no existe")
 		return &grpc_fulcrum.F_Merge_Data{FReloj: &reloj, FLog: ""}, nil
 	} 
 	

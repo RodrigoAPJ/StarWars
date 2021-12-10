@@ -5,7 +5,7 @@ Daniel Magaña Magaña 201873504-3
 Instrucciones:
 Se asume que todos los inputs de comandos estarán bien escritos y sin faltas ortográficas.
 Corra los archivos en este orden: Broker, Fulcrum 1, 2 y 3, Informantes y Leia. Esto para asegurar que los servidores esten abiertos antes que los clientes intenten unirse.
-Los registros planetarios y logs van a estar dentro de la carpeta Fulcrum, dentro de una carpeta llamada 0, 1 o 2 dependiendo de la eleccion que se haya hecho al iniciar cada servidor
+Dentro de la carpeta Fulcrum hay 3 carpetas, "0", "1" y "2", el servidor que se inició escribiendo 0 guardará sus registros planetarios y logs ahí, el que se inició con 1, en "1" y lo mismo para el 2
 Tener en cuenta que cuando a un servidor le llega un comando de parte de un informante y se encuentra una inconsistencia, primero se resuelve, se hace el merge con los otros servidores y despues se ejecuta el comando, por lo que el cambio (hecho por ese último comando) no se verá reflejado en los otros servidores inmediatamente
 Puede que Leia no lea la informacion mas actualizada, pero se asegura monotonic reads, por lo que nunca leerá informacion mas antigua que la que ya ha leido
 PD: Hicimos todo lo pedido en la tarea y lo probamos de pie a cabeza :D
@@ -21,7 +21,9 @@ Makefile:
     INFO:    clean + Iniciar cliente informante.
     LEIA:    clean + Inicia cliente de Leia.
 
-Debera correr en el siguiente orden los comandos obligatoriamente, en caso contrario fallará:
+Debera correr en el siguiente orden los comandos, en caso contrario fallará:*
+
+*Alternativamente, puede usar 7 consolas distintas y así ver los prints que pusimos para facilitar ver los datos que maneja cada servidor.
 
 Abrir máquina 120:
     estando en dentro de carpeta StarWars: 
@@ -37,7 +39,7 @@ Abrir máquina 118:
 
 Abrir máquina 119:
     estando en dentro de carpeta StarWars: 
-        make FULCRUM      //Se le preguntara que fulcrum abrir, ahi debe indicar 0
+        make FULCRUM      //Se le preguntara que fulcrum abrir, ahi debe indicar 2
 
 Volver a la máquina 117:
     Apretrar CTRL+Z y luego escribir bg, así el proceso seguira ejecutandose por detras y podra iniciar Leia.
@@ -61,3 +63,4 @@ SI QUIERE VOLVER A CORRER TODO DENUEVO RECUERDE MATAR LOS PROCESOS QUE ESTAN COR
 	kill %1 	//Para matar el proceso corriendo en background
 
 UNA VEZ HAGA ESTO EN TODAS LAS CONSOLAS CON PROCESOS CORRIENDO EN BACKGROUND PRODRA COMENZAR A ESCRIBIR TODOS LOS COMANDOS DE MAKE DENUEVO (OJO QUE ESTOS BORRARAN LOS REGISTROS CREADOS ANTERIORMENTE ANTES DE COMENZAR)
+
